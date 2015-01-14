@@ -1,0 +1,309 @@
+---
+  html_document:
+    toc: true
+    highlight: zenburn
+    theme: united
+---
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+               cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+               message=FALSE, prompt=TRUE, comment='', fig.cap='')
+```
+
+# Overview
+
+```{r qc-setup}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(edgeR)
+library(CHBUtils)
+library(pheatmap)
+project_summary = "/Users/rory/cache/datta-omp-gmp/combined-experiment/project-summary.csv"
+counts_file = "/Users/rory/cache/datta-omp-gmp/combined-experiment/combined.counts"
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
+"#0072B2", "#D55E00", "#CC79A7")
+summarydata = read.table(project_summary, header=TRUE, sep=",")
+rownames(summarydata) = summarydata$Name
+summarydata = summarydata[order(summarydata$Name),]
+counts = read.table(counts_file, header=TRUE, row.names="id")
+counts = counts[, order(colnames(counts))]
+cnames = unlist(lapply(colnames(counts), function (x) strsplit(x, ".", fixed=TRUE)[[1]][[1]]))
+colnames(counts) = cnames
+counts = counts[, c(4, 5, 6, 10, 11, 12, 13)]
+summarydata = subset(summarydata, age == "older")
+```
+
+
+# Quality control metrics
+
+## Mapped reads
+```{r mapped-plot}
+ggplot(summarydata, aes(x=Name, y=Mapped)) + 
+    geom_bar(stat="identity") +
+    ylab("mapped reads") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle = 90))
+```
+
+It looks like there are still some issues with the prep; the sequencing didn't work
+very well for some of the samples. 
+
+## Genomic mapping rate
+```{r mapping-rate-plot}
+ggplot(summarydata, aes(x=Name, y=Mapping.Rate)) + 
+    geom_bar(stat="identity") +
+    ylab("mapping rate") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle = 90))
+```
+
+Despite having less reads, GCD23 has a fine mapping rate. OMP23 and OMP24, however, have
+a very poor mapping rate. This indicates some kind of contamination in the sample;
+it might be the capture wasn't great, or there is some contamination in the samples such
+as adapter or even contamination from another organism. We'll have to dump OMP23 and OMP24,
+unfortunately.
+
+
+## Number of genes detected
+```{r genes-detected-plot}
+ggplot(summarydata, aes(x=Name, y=Genes.Detected)) +
+    geom_bar(stat="identity") +
+    ylab("genes detected") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle = 90))
+```
+
+More evidence for dropping OMP23 and OMP24.
+
+## Exonic mapping rate
+```{r exonic-mapping-plot}
+ggplot(summarydata, aes(x=Name, y=Exonic.Rate)) + 
+    geom_bar(stat="identity") +
+    ylab("exonic mapping rate") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle = 90))
+```
+
+The reads that do map in samples OMP23 and OMP24 tend to map in exons, which means it is not
+likely we have DNA contamination; so there is some other reason for those samples looking poor.
+
+## rRNA mapping rate
+```{r rRNA-rate-plot}
+ggplot(summarydata, aes(x=Name, y=rRNA.rate, fill=age)) + 
+    geom_bar(stat="identity") +
+    ylab("rRNA rate") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle = 90)) 
+```
+
+It isn't that there is a huge amount of rRNA contamination.
+
+
+## Boxplot of log10 counts per gene
+```{r boxplot-raw}
+melted = melt(counts)
+colnames(melted) = c("sample", "count")
+melted$sample = factor(melted$sample)
+melted$sample = reorder(melted$sample, colnames(counts))
+melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("") 
+```
+
+As expected the OMP23 and OMP24 samples are outliers in terms of the distribution of
+counts per gene.
+
+## Correlation heatmap of raw counts
+```{r heatmap-raw}
+p = ggheatmap(cor(counts)) 
+ggheatmap.show(p)
+```
+
+Despite there being major differences in the amount of sequence, the samples still cluster
+together based on OMP vs GMP and by age.
+
+## Boxplot of log10 TMM-normalized counts per gene
+Trimmed mean of M-values (TMM) normalization is described
+[here](http://genomebiology.com/2010/11/3/R25)
+
+Robinson, M. D., & Oshlack, A. (2010). A scaling normalization method for differential expression analysis of RNA-seq data. Genome Biology, 11(3). doi:10.1186/gb-2010-11-3-r25
+
+```{r boxplot-normalized}
+y = DGEList(counts=counts)
+y = calcNormFactors(y)
+normalized_counts = cpm(y, normalized.lib.sizes=TRUE)
+cnames = unlist(lapply(colnames(normalized_counts), function (x) strsplit(x, ".", fixed=TRUE)[[1]][[1]]))
+colnames(normalized_counts) = cnames
+melted = melt(normalized_counts)
+colnames(melted) = c("gene", "sample", "count")
+melted$sample = factor(melted$sample)
+melted$sample = reorder(melted$sample, colnames(counts))
+melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("") 
+```
+
+TMM normalizing doesn't save OMP23 and OMP24; they are outliers in terms of the distribution of
+counts per gene. The mean per gene is higher in these two samples; that indicates these
+libraries are low complexity, meaning the same genes were sequenced repeatedly. This might be
+a problem with either RNA capture or indicative of a degradation problem with the RNA.
+
+We will drop these samples from the analysis now.
+
+```{r drop-outliers}
+keep = !colnames(counts) %in% c("OMP23.counts", "OMP24.counts")
+counts = counts[, keep]
+summarydata = subset(summarydata, !Name %in% c("OMP23", "OMP24"))
+normalized_counts = normalized_counts[, keep]
+```
+
+## Correlation heatmap of TMM-normalized counts
+```{r heatmap-normalized}
+p = ggheatmap(cor(normalized_counts))
+ggheatmap.show(p)
+```
+
+## MDS plot of TMM-normalized counts
+```{r mds-normalized}
+mds(normalized_counts, k=length(colnames(normalized_counts)) - 1)
+```
+
+The OMP samples seem to cluster closer to each other than GCD samples; the GCD samples separate
+out by age. 
+
+GCD10 makes up its own cluster and OMP23 and OMP24 are off by themselves. We'll drop
+those three samples from the analysis, since they look to be outliers.
+
+
+
+## Differential expression
+We'll set up a new column that is a combination of the age and cell type, so we can test
+for differences between age and cell type.
+```{r de-setup}
+library(DESeq2)
+library(vsn)
+design = ~cell_type
+```
+
+# Differential expression
+```{r deseq2-expression-analysis, results='asis'}
+dds = DESeqDataSetFromMatrix(countData=counts,
+    colData=summarydata, design = design)
+dds = DESeq(dds)
+```
+
+## Dispersion estimates
+```{r dispersion-estimate}
+plotDispEsts(dds)
+```
+
+## Marker plot
+
+```{r marker-setup}
+res = results(dds)
+res_df = data.frame(res)
+annotated_file = "/Users/rory/cache/datta-omp-gmp/combined-experiment/annotated_combined.counts"
+annotation = read.table(annotated_file, header=TRUE, sep="\t")
+annotation = annotation[, c("id", "symbol")]
+annotated = merge(res_df, annotation, by.x="row.names", by.y="id", all.x=TRUE)
+colnames(annotated)[1] = "id"
+
+genes = c("Actb", "Omp", "Pde1c", "Cnga2", "Cnga4", "Gnal", "Gucy2d",
+          "Pde2a", "Car2", "Cnga3", "Emx1", "Ms4a1", "Ms4a2", "Ms4a3",
+          "Ms4a4b", "Ms4a4c", "Ms4a4d", "Ms4a5", "Ms4a6b",
+          "Ms4a6c", "Ms4a6d", "Ms4a7", "Ms4a8a", "Ms4a10", "Ms4a13",
+          "Ms4a15", "Trpc2", "Trpm5", "Ptprc")
+
+annotated$log2FoldChange = -annotated$log2FoldChange
+sub = subset(annotated, symbol %in% genes)
+sub$symbol = factor(sub$symbol, levels=unique(genes))
+
+genes[!genes %in% annotated$symbol]
+
+ggplot(subset(sub, symbol %in% genes), aes(factor(symbol), 2^log2FoldChange)) +
+    geom_bar(stat='identity', position='dodge', fill='steelblue') +
+    scale_y_log10() +
+    xlab("") + ylab("fold enrichment in GCD samples relative to OMP samples") +
+    theme_bw(base_size=12, base_family="Gill Sans MT") +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x=element_text(angle = 90, hjust = 0))
+```
+
+Looks correct!
+
+
+```{r DESeq-output, results='asis'}
+plotMA(res)
+res_df = data.frame(res)
+colors = ifelse(res_df$padj < 0.05, "sig", "nonsig")
+colors[is.na(colors)] = "nonsig"
+ms4_ids = subset(annotated, grepl("Ms4a", symbol))$id
+res_df$ms4 = rownames(res_df) %in% ms4_ids
+res_df$colors = colors
+ggplot(res_df, aes(x=log(baseMean), y=log2FoldChange, colour=colors)) +
+ggplot() + 
+    geom_point(data=res_df, aes(x=log(baseMean), y=log2FoldChange, colour=colors),
+      size=1, alpha=0.2, show_guide=FALSE) +
+    geom_point(data=subset(res_df[ms4_ids,]), aes(x=log(baseMean), y=log2FoldChange,
+                                                  colour=colors),
+       size=4, alpha=1, shape=0, show_guide=FALSE) +
+    theme_bw(base_size=12, base_family="Arial") +
+    theme(panel.grid.major = element_line(size = .5, color = "grey")) +
+    scale_colour_manual(values = c("#00000033", "#FF0000FF")) +
+    ylab(expression(log[2]*" fold change")) +
+    xlab(expression(log[10]*" mean expression"))
+```
+
+Here is a table of just the marker genes:
+
+```{r marker-gene-table}
+library(knitr)
+kable(subset(annotated, symbol %in% genes), format="markdown")
+```
+
+## Differentially expressed genes
+There are `r nrow(subset(res, padj < 0.1))` differentially expressed genes
+between the GCD and OMP cells. I wrote them out to a big table which I'll attach in
+the email.
+
+## Attach GO terms
+```{r attach-go}
+library(biomaRt)
+mart = useMart('ensembl', dataset='mmusculus_gene_ensembl')
+go_ids = getBM(attributes=c('ensembl_gene_id', 'go_id', 'name_1006'), filters='ensembl_gene_id',
+     values=annotated$id, mart=mart)
+x = split(go_ids$go_id, go_ids$ensembl_gene_id)
+b = lapply(x, function(x) paste(unlist(x), collapse=","))
+names(b) = NULL
+b = unlist(b)
+x = split(go_ids$name_1006, go_ids$ensembl_gene_id)
+d = lapply(x, function(x) paste(unlist(x), collapse=","))
+names(b) = NULL
+d = unlist(d)
+y = data.frame(id=names(x), go_ids=b, go_names=d)
+m = merge(annotated, y, by='id', all.x=TRUE)
+```
+
+```{r write-table}
+write.table(annotated, file="GCD vs OMP.tsv", quote=FALSE, sep="\t",
+    row.names=FALSE, col.names=TRUE)
+write.table(subset(annotated, padj < 0.1), file="de.tsv", quote=FALSE, sep="\t",
+  row.names=TRUE, col.names=TRUE)
+write.table(m, file="go_ids_annotated.tsv", quote=FALSE, sep="\t", row.names=FALSE,
+  col.names=TRUE)
+```
+
+Filtering down to get a small number of calls to look at. Give them the whole table if
+they like:
+table(subset(res_df, padj < 0.05 & abs(log2FoldChange) > 5 & log(baseMean) > 2.5)$ms4)
