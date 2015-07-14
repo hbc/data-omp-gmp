@@ -40,7 +40,7 @@ summarydata = subset(summarydata, age == "older")
 
 ## Mapped reads
 ```{r mapped-plot}
-ggplot(summarydata, aes(x=Name, y=Mapped)) + 
+ggplot(summarydata, aes(x=Name, y=Mapped)) +
     geom_bar(stat="identity") +
     ylab("mapped reads") + xlab("") +
     theme_bw(base_size=12) +
@@ -49,11 +49,11 @@ ggplot(summarydata, aes(x=Name, y=Mapped)) +
 ```
 
 It looks like there are still some issues with the prep; the sequencing didn't work
-very well for some of the samples. 
+very well for some of the samples.
 
 ## Genomic mapping rate
 ```{r mapping-rate-plot}
-ggplot(summarydata, aes(x=Name, y=Mapping.Rate)) + 
+ggplot(summarydata, aes(x=Name, y=Mapping.Rate)) +
     geom_bar(stat="identity") +
     ylab("mapping rate") + xlab("") +
     theme_bw(base_size=12) +
@@ -82,7 +82,7 @@ More evidence for dropping OMP23 and OMP24.
 
 ## Exonic mapping rate
 ```{r exonic-mapping-plot}
-ggplot(summarydata, aes(x=Name, y=Exonic.Rate)) + 
+ggplot(summarydata, aes(x=Name, y=Exonic.Rate)) +
     geom_bar(stat="identity") +
     ylab("exonic mapping rate") + xlab("") +
     theme_bw(base_size=12) +
@@ -95,12 +95,12 @@ likely we have DNA contamination; so there is some other reason for those sample
 
 ## rRNA mapping rate
 ```{r rRNA-rate-plot}
-ggplot(summarydata, aes(x=Name, y=rRNA.rate, fill=age)) + 
+ggplot(summarydata, aes(x=Name, y=rRNA.rate, fill=age)) +
     geom_bar(stat="identity") +
     ylab("rRNA rate") + xlab("") +
     theme_bw(base_size=12) +
     theme(panel.grid.major = element_line(size = .5, color = "grey"),
-          axis.text.x = element_text(angle = 90)) 
+          axis.text.x = element_text(angle = 90))
 ```
 
 It isn't that there is a huge amount of rRNA contamination.
@@ -116,7 +116,7 @@ melted$count = log(melted$count)
 ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
     theme_bw(base_size=12) +
     theme(panel.grid.major = element_line(size = .5, color = "grey"),
-          axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("") 
+          axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("")
 ```
 
 As expected the OMP23 and OMP24 samples are outliers in terms of the distribution of
@@ -124,7 +124,7 @@ counts per gene.
 
 ## Correlation heatmap of raw counts
 ```{r heatmap-raw}
-p = ggheatmap(cor(counts)) 
+p = ggheatmap(cor(counts))
 ggheatmap.show(p)
 ```
 
@@ -151,7 +151,7 @@ melted$count = log(melted$count)
 ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
     theme_bw(base_size=12) +
     theme(panel.grid.major = element_line(size = .5, color = "grey"),
-          axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("") 
+          axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("")
 ```
 
 TMM normalizing doesn't save OMP23 and OMP24; they are outliers in terms of the distribution of
@@ -162,7 +162,7 @@ a problem with either RNA capture or indicative of a degradation problem with th
 We will drop these samples from the analysis now.
 
 ```{r drop-outliers}
-keep = !colnames(counts) %in% c("OMP23.counts", "OMP24.counts")
+keep = !colnames(counts) %in% c("OMP23", "OMP24")
 counts = counts[, keep]
 summarydata = subset(summarydata, !Name %in% c("OMP23", "OMP24"))
 normalized_counts = normalized_counts[, keep]
@@ -180,7 +180,7 @@ mds(normalized_counts, k=length(colnames(normalized_counts)) - 1)
 ```
 
 The OMP samples seem to cluster closer to each other than GCD samples; the GCD samples separate
-out by age. 
+out by age.
 
 GCD10 makes up its own cluster and OMP23 and OMP24 are off by themselves. We'll drop
 those three samples from the analysis, since they look to be outliers.
@@ -252,17 +252,17 @@ ms4_ids = subset(annotated, grepl("Ms4a", symbol))$id
 res_df$ms4 = rownames(res_df) %in% ms4_ids
 res_df$colors = colors
 ggplot(res_df, aes(x=log(baseMean), y=log2FoldChange, colour=colors)) +
-ggplot() + 
     geom_point(data=res_df, aes(x=log(baseMean), y=log2FoldChange, colour=colors),
       size=1, alpha=0.2, show_guide=FALSE) +
     geom_point(data=subset(res_df[ms4_ids,]), aes(x=log(baseMean), y=log2FoldChange,
                                                   colour=colors),
        size=4, alpha=1, shape=0, show_guide=FALSE) +
     theme_bw(base_size=12, base_family="Arial") +
-    theme(panel.grid.major = element_line(size = .5, color = "grey")) +
+    theme(panel.grid.major = element_blank()) +
     scale_colour_manual(values = c("#00000033", "#FF0000FF")) +
     ylab(expression(log[2]*" fold change")) +
     xlab(expression(log[10]*" mean expression"))
+
 ```
 
 Here is a table of just the marker genes:
