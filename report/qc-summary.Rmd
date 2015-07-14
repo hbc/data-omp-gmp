@@ -244,6 +244,7 @@ Looks correct!
 
 
 ```{r DESeq-output, results='asis'}
+library(extrafont)
 plotMA(res)
 res_df = data.frame(res)
 colors = ifelse(res_df$padj < 0.05, "sig", "nonsig")
@@ -257,12 +258,12 @@ ggplot(res_df, aes(x=log(baseMean), y=log2FoldChange, colour=colors)) +
     geom_point(data=subset(res_df[ms4_ids,]), aes(x=log(baseMean), y=log2FoldChange,
                                                   colour=colors),
        size=4, alpha=1, shape=0, show_guide=FALSE) +
-    theme_bw(base_size=12, base_family="Arial") +
+    theme_bw(base_size=12) +
     theme(panel.grid.major = element_blank()) +
     scale_colour_manual(values = c("#00000033", "#FF0000FF")) +
     ylab(expression(log[2]*" fold change")) +
     xlab(expression(log[10]*" mean expression"))
-
+ggsave("ma-plot-ms4-hilighted-nogrid.pdf")
 ```
 
 Here is a table of just the marker genes:
