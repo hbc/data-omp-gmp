@@ -1,0 +1,33 @@
+\documentclass{article}
+\begin{document}
+\section*{Alignment and differential expression}
+The RNA-sequencing reads were processed using the RNA-seq pipeline implemented
+in version 0.8.3a-9483413 of the \textbf{bcbio-nextgen} analysis project.
+Briefly, poor quality bases with PHRED scores less than
+five\cite{Macmanes:2014ha}, contaminant adapter sequences and polyA tails were
+trimmed from the ends of reads with cutadapt\cite{Martin:2011va} version 1.4.2,
+discarding reads shorter than twenty bases. A STAR\cite{Dobin:2013fg} index was
+created from a combination of the \emph{Mus musculus} version 10 (mm10) build of
+the mouse genome and the Ensembl release 75 gene annotation. Trimmed reads were
+aligned to the STAR index, discarding reads with ten or more multiple matches to
+the genome. Quality metrics including mapping percentage, rRNA contamination,
+average coverage across the length of the genes, read quality, adapter
+contamination and others were calculated using a combination of FastQC,
+RNA-SeQC\cite{DeLuca:2012dp} and custom functions from \textbf{bcbio-nextgen}
+and \textbf{bcbio.rnaseq}. Two OMP samples and one GMP sample were dropped from
+the analysis due to failing quality control metrics, leaving three GMP samples
+and two OMP samples. Reads mapping to genes were counted using
+featureCounts\cite{Liao:2014cj}
+version 1.4.4, excluding reads mapping
+multiple times to the genome and reads that could not be uniquely assigned to a
+gene.
+
+Counts were normalized and differential expression between cell types was called
+at the level of the gene using DESeq2\cite{Love:2014vr} version 1.6.3, filtering
+for genes using a BH corrected\cite{Benjamini:1995p1395} false discovery rate
+(FDR) cutoff of 0.1.
+
+\clearpage
+\bibliography{rnaseq}
+\bibliographystyle{plain}
+\end{document}
